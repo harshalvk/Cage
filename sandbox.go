@@ -14,6 +14,12 @@ type SandboxManager struct {
 	docker *client.Client
 }
 
+type ExecResult struct {
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr"`
+	ExitCode int	`json:"exit_code"`
+}
+
 func NewSandboxManager() (*SandboxManager, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 
@@ -68,4 +74,40 @@ func (sm *SandboxManager)	KillSandbox(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (sm *SandboxManager) ExecCommand(ctx context.Context, containerID string, cmd []string) (*ExecResult, error) {
+	execConfig := container.ExecOptions{
+		Cmd: cmd,
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execCreate, err := sm.docker.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create exec: %w", err)
+	}
+
+	attachResp, err := sm.docker.ContainerExecAttach(ctx, execCreate.ID, container.ExecStartOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to attach exec: %w", err)
+	}
+	defer attachResp.Close()
+
+	stdout, stderr, err := demuxOutput(attachResp.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read exec output: %w", err)
+	}
+
+	inspect, err := sm.docker.ContainerExecInspect(ctx, execCreate.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect exec: %w", err)
+	}
+
+	return &ExecResult{
+		Stdout: stdout,
+		Stderr: stderr,
+		ExitCode: inspect.ExitCode,
+	}, nil
+
 }
