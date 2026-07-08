@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -12,24 +10,28 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
 	sm, err := NewSandboxManager()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	store := NewStore()
+	api := NewAPI(sm, store)
+	
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	id, err := sm.CreateSandbox(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("sandbox created: ", id)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request){
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	})
+
+	r.Route("/sandboxes", func(r chi.Router) {
+		r.Post("/", api.CreateSandbox)
+		r.Get("/", api.ListSandboxes)
+		r.Get("/{id}", api.GetSandbox)
+		r.Delete("/{id}", api.DeleteSandbox)
 	})
 
 	log.Println("listening on :8080")
