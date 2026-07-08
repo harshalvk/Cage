@@ -1,0 +1,91 @@
+# Cage 
+
+**Cage** is an open-source, self-hostable clone of [E2B](https://e2b.dev) — a backend service for spinning up secure, isolated sandboxes to run untrusted or AI-generated code. Built in Go.
+
+> ⚠️ **Work in progress.** Cage is a learning project and is not production-ready. Currently uses Docker containers as the isolation layer, with plans to explore Firecracker microVMs.
+
+## What is Cage?
+
+Cage lets you programmatically create isolated environments ("sandboxes"), run commands inside them, and tear them down — all through a simple REST API. Think of it as the infrastructure layer you'd use to let an AI agent safely execute code without touching your host system.
+
+```bash
+# create a sandbox
+curl -X POST http://localhost:8080/sandboxes
+
+# → {"id":"a1b2c3...","status":"running","created_at":"2026-07-08T12:00:00Z"}
+```
+
+## Features
+
+- [x] Sandbox lifecycle management (create, list, get, delete)
+- [x] Docker-backed isolation
+- [ ] Command execution inside sandboxes (stdout/stderr streaming)
+- [ ] File upload/download to/from sandboxes
+- [ ] Persistent storage (Postgres) for sandbox metadata
+- [ ] Idle/expiry-based sandbox cleanup
+- [ ] API key authentication
+- [ ] Custom sandbox templates
+- [ ] Pause/resume support
+- [ ] Firecracker microVM backend (long-term goal)
+
+## Architecture
+
+Cage exposes a REST API that manages the lifecycle of sandboxes. Each sandbox currently maps 1:1 to a Docker container, with an in-memory (soon Postgres-backed) store tracking metadata.
+
+```
+Client
+  │
+  ▼
+REST API (chi router)
+  │
+  ▼
+SandboxManager ──► Docker Engine
+  │
+  ▼
+Store (sandbox metadata)
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Go 1.22+
+- Docker (running locally, accessible via the default socket)
+
+### Installation
+
+```bash
+git clone https://github.com/<your-username>/cage.git
+cd cage
+go mod tidy
+```
+
+### Running
+
+```bash
+go run .
+```
+
+The API will be available at `http://localhost:8080`.
+
+### API Reference
+
+| Method | Endpoint            | Description              |
+|--------|----------------------|---------------------------|
+| GET    | `/health`             | Health check              |
+| POST   | `/sandboxes`          | Create a new sandbox      |
+| GET    | `/sandboxes`           | List all sandboxes        |
+| GET    | `/sandboxes/{id}`      | Get sandbox details       |
+| DELETE | `/sandboxes/{id}`      | Kill and remove a sandbox |
+
+## Project Status
+
+This project is being built incrementally as a learning exercise in Go, container orchestration, and infrastructure design. Progress and design notes are tracked as the project evolves — see [Issues](../../issues) for planned work.
+
+## License
+
+MIT
+
+## Acknowledgements
+
+Inspired by [E2B](https://e2b.dev), an excellent open-source sandbox infrastructure platform. Cage is an independent educational project and is not affiliated with E2B/FoundryLabs.
