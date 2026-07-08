@@ -20,7 +20,7 @@ curl -X POST http://localhost:8080/sandboxes
 
 - [x] Sandbox lifecycle management (create, list, get, delete)
 - [x] Docker-backed isolation
-- [ ] Command execution inside sandboxes (stdout/stderr streaming)
+- [x] Command execution inside sandboxes (stdout/stderr streaming)
 - [ ] File upload/download to/from sandboxes
 - [ ] Persistent storage (Postgres) for sandbox metadata
 - [ ] Idle/expiry-based sandbox cleanup
