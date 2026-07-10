@@ -2,19 +2,18 @@ version: "2"
 
 linters:
   enable:
-    - govet          # catches suspicious constructs (nil checks, shadowing, etc.)
-    - errcheck        # flags ignored error return values
-    - staticcheck     # broad correctness + simplification checks
-    - unused          # unused variables, functions, imports
-    - ineffassign     # assignments that are never used
-    - gocritic        # style + diagnostic checks
-    - bodyclose       # ensures http response bodies are closed
-    - sqlclosecheck   # ensures sql.Rows/Stmt are closed
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - gocritic
+    - bodyclose
+    - sqlclosecheck
+  exclusions:
+    paths:
+      - tmp
+      - migrations
 
 run:
   timeout: 3m
-
-issues:
-  exclude-dirs:
-    - tmp
-    - migrations
