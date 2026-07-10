@@ -19,6 +19,10 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
+	if err := RunMigrations(cfg.DatabaseURL); err != nil {
+		log.Fatalf("migration error: %v", err)
+	}
+
 	store, err := NewStore(ctx, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatal(err)

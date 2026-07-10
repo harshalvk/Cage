@@ -10,7 +10,6 @@ services:
       - POSTGRES_DB=cage
     volumes:
       - cage-postgres:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cage -d cage"]
       interval: 5s
