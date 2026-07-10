@@ -1,0 +1,6 @@
+tmp/
+.git/
+.env
+*.exe
+.air.toml
+README.md

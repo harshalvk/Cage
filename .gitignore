@@ -1,3 +1,5 @@
 tmp 
 .env
 *.exe
+FOR-ME.md
+.env.docker
