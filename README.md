@@ -21,8 +21,8 @@ curl -X POST http://localhost:8080/sandboxes
 - [x] Sandbox lifecycle management (create, list, get, delete)
 - [x] Docker-backed isolation
 - [x] Command execution inside sandboxes (stdout/stderr streaming)
-- [ ] File upload/download to/from sandboxes
-- [ ] Persistent storage (Postgres) for sandbox metadata
+- [x] File upload/download to/from sandboxes
+- [x] Persistent storage (Postgres) for sandbox metadata
 - [ ] Idle/expiry-based sandbox cleanup
 - [ ] API key authentication
 - [ ] Custom sandbox templates
@@ -49,12 +49,15 @@ Cage exposes a REST API that manages the lifecycle of sandboxes. Each sandbox cu
 git clone https://github.com/<your-username>/cage.git
 cd cage
 go mod tidy
+cp .env.example .env   # fill in real values
+make setup             # installs git hooks
+make migrate-up         # apply DB schema
 ```
 
 ### Running
 
 ```bash
-go run .
+make dev    # live-reloading dev server
 ```
 
 The API will be available at `http://localhost:8080`.
