@@ -17,6 +17,11 @@ type ExecRequest struct {
 	Cmd []string `json:"cmd"`
 }
 
+type WriteFileRequest struct {
+	Path string `json:"path"`
+	Content string `json:"content"` // for now plain text; base64 later for binary
+}
+
 func NewAPI(sm *SandboxManager, store *Store) *API {
 	return &API{sm: sm, store: store}
 }
@@ -104,4 +109,54 @@ func (a *API) ExecCommand(w http.ResponseWriter, r *http.Request){
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+func (a *API) WriteFile(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	sb, ok := a.store.Get(id)
+	if !ok {
+		http.Error(w, "sandbox not found", http.StatusNotFound)
+		return
+	}
+
+	var req WriteFileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Path == "" {
+		http.Error(w, "path is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := a.sm.WriteFile(r.Context(), sb.ContainerID, req.Path, []byte(req.Content)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) ReadFile(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	sb, ok := a.store.Get(id)
+	if !ok {
+		http.Error(w, "sandbox not found", http.StatusNotFound)
+		return
+	}
+
+	path := r.URL.Query().Get("path")
+	if path == ""{
+		http.Error(w, "path query param is required", http.StatusBadRequest)
+		return
+	}
+
+	content, err := a.sm.ReadFile(r.Context(), sb.ContainerID, path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(content)
 }
