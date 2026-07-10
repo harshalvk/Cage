@@ -1,4 +1,5 @@
-# Cage  [![CI](https://github.com/Harshalvk/cage/actions/workflows/ci.yml/badge.svg)](https://github.com/Harshalvk/cage/actions/workflows/ci.yml)
+# Cage [![CI](https://github.com/Harshalvk/cage/actions/workflows/ci.yml/badge.svg)](https://github.com/Harshalvk/cage/actions/workflows/ci.yml)
+
 <img width="1788" height="464" alt="image" src="https://github.com/user-attachments/assets/d463f5f5-9029-4a4f-8c18-2f03d5339ed4" />
 
 **Cage** is an open-source, self-hostable clone of [E2B](https://e2b.dev) — a backend service for spinning up secure, isolated sandboxes to run untrusted or AI-generated code. Built in Go.
@@ -23,18 +24,43 @@ curl -X POST http://localhost:8080/sandboxes
 - [x] Command execution inside sandboxes (stdout/stderr streaming)
 - [x] File upload/download to/from sandboxes
 - [x] Persistent storage (Postgres) for sandbox metadata
-- [ ] Idle/expiry-based sandbox cleanup
-- [ ] API key authentication
+- [x] Idle/expiry-based sandbox cleanup
+- [x] API key authentication
 - [ ] Custom sandbox templates
 - [ ] Pause/resume support
 - [ ] Firecracker microVM backend (long-term goal)
+
+## Project Structure
+```bash
+cage/
+├── cmd/
+│   ├── cage/           # main entrypoint — wires everything together and starts the HTTP server
+│   └── genkey/         # CLI to generate API keys
+├── internal/
+│   ├── api/            # HTTP handlers + auth middleware
+│   ├── auth/            # API key generation & hashing
+│   ├── config/          # env var loading
+│   ├── db/               # migration runner (golang-migrate)
+│   ├── reaper/           # background job that kills expired sandboxes
+│   ├── reconcile/         # syncs DB state with actual Docker state on boot
+│   ├── sandbox/           # Docker SDK wrapper — create/exec/read/write files
+│   └── store/             # Postgres-backed sandbox + API key persistence
+├── migrations/            # golang-migrate SQL files (paired .up/.down)
+├── scripts/               # git hook scripts (e.g. commit-msg validation)
+├── .air.toml              # live reload config
+├── .env.example           # documents required env vars
+├── .golangci.yml          # linter config
+├── docker-compose.yml     # Postgres + Cage app stack
+├── Dockerfile             # multi-stage build for the app image
+├── lefthook.yml           # pre-commit/commit-msg hooks
+└── Makefile               # dev, lint, fmt, migrate, genkey commands
+```
 
 ## Architecture
 
 Cage exposes a REST API that manages the lifecycle of sandboxes. Each sandbox currently maps 1:1 to a Docker container, with an in-memory (soon Postgres-backed) store tracking metadata.
 
 <img width="6438" height="3579" alt="image" src="https://github.com/user-attachments/assets/5495eb24-523e-47d3-b1a0-b6482a64ec08" />
-
 
 ## Getting Started
 
@@ -59,11 +85,15 @@ make migrate-up         # apply DB schema
 ```
 
 ### Running
+
 **Option A - Full stack via docker compose (postgres + cage, containerized):**
+
 ```bash
 docker compose up --build
 ```
+
 **Option B - Local dev (golang on host, postgres in docker, live reload):**
+
 ```bash
 docker compose up -d cage-postgres
 make migrate-up
@@ -74,26 +104,45 @@ The API will be available at `http://localhost:8080`.
 
 ## Development
 
-| Command              | Description                          |
-|-----------------------|---------------------------------------|
-| `make dev`             | Run with live reload (Air)            |
-| `make build`           | Build the binary                      |
-| `make lint`            | Run golangci-lint                     |
-| `make fmt`             | Format code                            |
-| `make migrate-up`      | Apply DB migrations                    |
-| `make migrate-down`    | Roll back last migration              |
-| `make migrate-create name=X` | Create a new migration pair    |
-| `make test`            | Run tests                             |
+| Command                      | Description                 |
+| ---------------------------- | --------------------------- |
+| `make dev`                   | Run with live reload (Air)  |
+| `make build`                 | Build the binary            |
+| `make lint`                  | Run golangci-lint           |
+| `make fmt`                   | Format code                 |
+| `make migrate-up`            | Apply DB migrations         |
+| `make migrate-down`          | Roll back last migration    |
+| `make migrate-create name=X` | Create a new migration pair |
+| `make test`                  | Run tests                   |
+| `make genkey name=X` | Generate a new API key labeled X |
 
 ### API Reference
 
-| Method | Endpoint            | Description              |
-|--------|----------------------|---------------------------|
-| GET    | `/health`             | Health check              |
-| POST   | `/sandboxes`          | Create a new sandbox      |
-| GET    | `/sandboxes`           | List all sandboxes        |
-| GET    | `/sandboxes/{id}`      | Get sandbox details       |
-| DELETE | `/sandboxes/{id}`      | Kill and remove a sandbox |
+| Method | Endpoint          | Description               |
+| ------ | ----------------- | ------------------------- |
+| GET    | `/health`         | Health check              |
+| POST   | `/sandboxes`      | Create a new sandbox      |
+| GET    | `/sandboxes`      | List all sandboxes        |
+| GET    | `/sandboxes/{id}` | Get sandbox details       |
+| DELETE | `/sandboxes/{id}` | Kill and remove a sandbox |
+
+## Authentication
+
+All `/sandboxes` routes require an API key, passed as a Bearer token:
+
+```bash
+curl -X POST http://localhost:8080/sandboxes -H "Authorization: Bearer <your-api-key>"
+```
+
+`/health` remains public and requires no key
+
+### Generating a key
+
+```bash
+make genkey name=local-dev
+```
+
+This prints the raw key once - it is never shown again and only its hash is stored
 
 ## Project Status
 
@@ -106,4 +155,3 @@ MIT
 ## Acknowledgements
 
 Inspired by [E2B](https://e2b.dev), an excellent open-source sandbox infrastructure platform. Cage is an independent educational project and is not affiliated with E2B/FoundryLabs.
-
