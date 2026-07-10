@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -17,11 +18,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	sm, err := NewSandboxManager()
 		if err != nil {
 		log.Fatal(err)
 	}
+
+		if err := Reconcile(ctx, sm, store); err != nil {
+		log.Printf("reconcile failed: %v", err)
+	}
+	
+	reaper := NewReaper(sm, store, 5*time.Second)
+	go reaper.Start(ctx)
 	
 	api := NewAPI(sm, store)
 	
