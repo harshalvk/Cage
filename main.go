@@ -13,8 +13,13 @@ import (
 
 func main() {
 	ctx := context.Background()
-	connString := "postgres://cage:cage@localhost:5432/cage"
-	store, err := NewStore(ctx, connString)
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		log.Fatalf("config error: %v", err)
+	}
+
+	store, err := NewStore(ctx, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,11 +36,10 @@ func main() {
 	reaper := NewReaper(sm, store, 5*time.Second)
 	go reaper.Start(ctx)
 	
-	api := NewAPI(sm, store)
+	api := NewAPI(sm, store, cfg.SandboxTTL)
 	
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request){
 		w.Header().Set("Content-Type", "application/json")

@@ -12,8 +12,9 @@ import (
 )
 
 type API struct {
-	sm    *SandboxManager
-	store *Store
+	sm    		 *SandboxManager
+	store 		 *Store
+	sandboxTTL time.Duration
 }
 
 type ExecRequest struct {
@@ -25,8 +26,8 @@ type WriteFileRequest struct {
 	Content string `json:"content"` // for now plain text; base64 later for binary
 }
 
-func NewAPI(sm *SandboxManager, store *Store) *API {
-	return &API{sm: sm, store: store}
+func NewAPI(sm *SandboxManager, store *Store, sandboxTTL time.Duration) *API {
+	return &API{sm: sm, store: store, sandboxTTL: sandboxTTL}
 }
 
 func (a *API) CreateSandbox(w http.ResponseWriter, r *http.Request){
@@ -43,7 +44,7 @@ func (a *API) CreateSandbox(w http.ResponseWriter, r *http.Request){
 		ContainerID: containerID,
 		Status: StatusRunning,
 		CreatedAt: timeNow(),
-		ExpiresAt: timeNow().Add(1 * time.Hour),
+		ExpiresAt: timeNow().Add(a.sandboxTTL),
 	}
 	a.store.Save(r.Context(), sb)
 
