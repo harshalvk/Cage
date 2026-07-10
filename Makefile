@@ -37,3 +37,6 @@ setup:
 
 clean:
 	rm -rf tmp
+
+genkey:
+	go run ./cmd/genkey -name=$(name)
