@@ -40,8 +40,12 @@ Cage exposes a REST API that manages the lifecycle of sandboxes. Each sandbox cu
 
 ### Prerequisites
 
-- Go 1.22+
-- Docker (running locally, accessible via the default socket)
+- Go 1.25+
+- Docker + Docker Compose
+- [golang-migrate](https://github.com/golang-migrate/migrate) CLI
+- [Air](https://github.com/air-verse/air) (optional, for live reload)
+- [golangci-lint](https://golangci-lint.run/) (optional, for linting)
+- [Lefthook](https://github.com/evilmartians/lefthook) (optional, for git hooks)
 
 ### Installation
 
@@ -55,12 +59,31 @@ make migrate-up         # apply DB schema
 ```
 
 ### Running
-
+**Option A - Full stack via docker compose (postgres + cage, containerized):**
 ```bash
+docker compose up --build
+```
+**Option B - Local dev (golang on host, postgres in docker, live reload):**
+```bash
+docker compose up -d cage-postgres
+make migrate-up
 make dev    # live-reloading dev server
 ```
 
 The API will be available at `http://localhost:8080`.
+
+## Development
+
+| Command              | Description                          |
+|-----------------------|---------------------------------------|
+| `make dev`             | Run with live reload (Air)            |
+| `make build`           | Build the binary                      |
+| `make lint`            | Run golangci-lint                     |
+| `make fmt`             | Format code                            |
+| `make migrate-up`      | Apply DB migrations                    |
+| `make migrate-down`    | Roll back last migration              |
+| `make migrate-create name=X` | Create a new migration pair    |
+| `make test`            | Run tests                             |
 
 ### API Reference
 
@@ -83,3 +106,4 @@ MIT
 ## Acknowledgements
 
 Inspired by [E2B](https://e2b.dev), an excellent open-source sandbox infrastructure platform. Cage is an independent educational project and is not affiliated with E2B/FoundryLabs.
+
