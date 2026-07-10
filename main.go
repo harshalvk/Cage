@@ -33,6 +33,8 @@ func main() {
 		r.Get("/{id}", api.GetSandbox)
 		r.Delete("/{id}", api.DeleteSandbox)
 		r.Post("/{id}/exec", api.ExecCommand)
+		r.Post("/{id}/files", api.WriteFile)
+		r.Get("/{id}/files", api.ReadFile)
 	})
 
 	log.Println("listening on :8080")
