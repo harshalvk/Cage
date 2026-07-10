@@ -163,3 +163,14 @@ func (sm *SandboxManager) ReadFile(ctx context.Context, containerID, srcPath str
 	}
 	return content, nil
 }
+
+func (sm *SandboxManager) IsRunning(ctx context.Context, containerID string) (bool, error) {
+	inspect, err := sm.docker.ContainerInspect(ctx, containerID)
+	if err != nil {
+		if client.IsErrNotFound(err){
+			return false, nil //container doesn't exists at all
+		}
+		return  false, err
+	}
+	return inspect.State.Running, nil
+}
