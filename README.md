@@ -144,10 +144,6 @@ make genkey name=local-dev
 
 This prints the raw key once - it is never shown again and only its hash is stored
 
-## Project Status
-
-This project is being built incrementally as a learning exercise in Go, container orchestration, and infrastructure design. Progress and design notes are tracked as the project evolves — see [Issues](../../issues) for planned work.
-
 ## License
 
 MIT
