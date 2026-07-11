@@ -36,9 +36,7 @@ func NewSandboxManager() (*SandboxManager, error) {
 }
 
 // this function pulls the base image (if not present) and starts a container
-func (sm *SandboxManager) CreateSandbox(ctx context.Context) (string, error) {
-	imageRef := "alpine:latest" // start simple, swap later
-
+func (sm *SandboxManager) CreateSandbox(ctx context.Context, imageRef string) (string, error) {
 	// pull image
 	reader, err := sm.docker.ImagePull(ctx, imageRef, image.PullOptions{})
 
