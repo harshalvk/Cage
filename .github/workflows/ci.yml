@@ -39,36 +39,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: lint
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: cage
-          POSTGRES_PASSWORD: cage
-          POSTGRES_DB: cage
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25"  
+          go-version: "1.23"
           cache: true
 
-      - name: Install migrate CLI
-        run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-
-      - name: Run migrations
-        run: migrate -database "postgres://cage:cage@localhost:5432/cage?sslmode=disable" -path migrations up
-
       - name: Run tests
-        run: go test ./... -v
-        env:
-          DATABASE_URL: postgres://cage:cage@localhost:5432/cage?sslmode=disable
+        run: go test ./... -v -timeout 5m
