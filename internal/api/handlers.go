@@ -83,6 +83,12 @@ func (a *API) CreateSandbox(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) GetSandbox(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+
+	if _, err := uuid.Parse(id); err != nil {
+		http.Error(w, "sandbox not found", http.StatusNotFound)
+		return
+	}
+
 	sb, err := a.store.Get(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
