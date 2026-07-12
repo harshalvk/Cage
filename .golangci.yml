@@ -10,10 +10,12 @@ linters:
     - gocritic
     - bodyclose
     - sqlclosecheck
+
   exclusions:
     paths:
       - tmp
       - migrations
+      - _test\.go
 
 run:
   timeout: 3m

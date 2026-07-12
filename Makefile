@@ -29,7 +29,14 @@ migrate-create:
 	migrate create -ext sql -dir migrations -seq $(name)
 
 test:
-	go test ./...
+	go test ./... -v
+
+test-short:
+	go test ./... -short -v
+
+test-converge:
+	go test ./... -coverprofile=coverage.out
+	go toll cover -html=coverage.out -o coverage.html
 
 setup:
 	lefthook install
