@@ -130,10 +130,11 @@ func TestResumeSandbox_NotFound(t *testing.T) {
 	st := setupTestStore(t)
 	a := NewAPI(nil, st, 0)
 
+	id := uuid.NewString()
 	r := chi.NewRouter()
 	r.Post("/sandboxes/{id}/resume", a.ResumeSandbox)
 
-	req := httptest.NewRequest(http.MethodPost, "/sandboxes/does-not-exist/resume", nil)
+	req := httptest.NewRequest(http.MethodPost, "/sandboxes/"+id+"/resume", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
