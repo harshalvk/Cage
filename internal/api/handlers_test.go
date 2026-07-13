@@ -89,3 +89,51 @@ func TestGetSandbox_MalformedID(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, w.Result().StatusCode, "malformed ID should be treated as not found, not a server error")
 }
+
+func TestPauseSandbox_WrongStatus(t *testing.T) {
+	st := setupTestStore(t)
+	ctx := context.Background()
+
+	sb := &store.Sandbox{ID: "sb-paused-already", ContainerID: "c-1", Status: store.StatusPaused}
+	require.NoError(t, st.Save(ctx, sb))
+
+	a := NewAPI(nil, st, 0)
+	r := chi.NewRouter()
+	r.Post("/sandboxes/{id}/pause", a.PauseSandbox)
+
+	req := httptest.NewRequest(http.MethodPost, "/sandboxes/sb-paused-already/pause", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+}
+
+func TestResumeSandbox_WrongStatus(t *testing.T) {
+	st := setupTestStore(t)
+	ctx := context.Background()
+
+	sb := &store.Sandbox{ID: "sb-running-already", ContainerID: "c-1", Status: store.StatusRunning}
+	require.NoError(t, st.Save(ctx, sb))
+
+	a := NewAPI(nil, st, 0)
+	r := chi.NewRouter()
+	r.Post("/sandboxes/{id}/resume", a.ResumeSandbox)
+
+	req := httptest.NewRequest(http.MethodPost, "/sandboxes/sb-running-already/resume", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusConflict, w.Result().StatusCode)
+}
+
+func TestResumeSandbox_NotFound(t *testing.T) {
+	st := setupTestStore(t)
+	a := NewAPI(nil, st, 0)
+
+	r := chi.NewRouter()
+	r.Post("/sandboxes/{id}/resume", a.ResumeSandbox)
+
+	req := httptest.NewRequest(http.MethodPost, "/sandboxes/does-not-exist/resume", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+}
