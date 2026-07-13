@@ -27,7 +27,7 @@ curl -X POST http://localhost:8080/sandboxes
 - [x] Idle/expiry-based sandbox cleanup
 - [x] API key authentication
 - [x] Custom sandbox templates
-- [ ] Pause/resume support
+- [x] Pause/resume support
 - [ ] Firecracker microVM backend (long-term goal)
 
 ## Project Structure
