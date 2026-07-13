@@ -1,0 +1,1 @@
+ALTER TABLE sandboxes DROP COLUMN paused_image_id;
