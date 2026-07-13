@@ -14,15 +14,17 @@ type SandboxStatus string
 const (
 	StatusRunning SandboxStatus = "running"
 	StatusStopped SandboxStatus = "stopped"
+	StatusPaused  SandboxStatus = "paused"
 )
 
 type Sandbox struct {
-	ID           string        `json:"id"`
-	ContainerID  string        `json:"-"`
-	Status       SandboxStatus `json:"status"`
-	CreatedAt    time.Time     `json:"created_at"`
-	ExpiresAt    time.Time     `json:"expires_at"`
-	TemplateSlug string        `json:"template"`
+	ID            string        `json:"id"`
+	ContainerID   string        `json:"-"`
+	Status        SandboxStatus `json:"status"`
+	CreatedAt     time.Time     `json:"created_at"`
+	ExpiresAt     time.Time     `json:"expires_at"`
+	TemplateSlug  string        `json:"template"`
+	PausedImageID *string       `json:"-"`
 }
 
 type Template struct {
@@ -49,10 +51,11 @@ func NewStore(ctx context.Context, connString string) (*Store, error) {
 
 func (s *Store) Save(ctx context.Context, sb *Sandbox) error {
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO sandboxes (id, container_id, status, created_at, expires_at, template_slug)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (id) DO UPDATE SET status = $3`,
-		sb.ID, sb.ContainerID, sb.Status, sb.CreatedAt, sb.ExpiresAt, sb.TemplateSlug,
+		`INSERT INTO sandboxes (id, container_id, status, created_at, expires_at, template_slug, paused_image_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (id) DO UPDATE SET
+		container_id = $2, status = $3, created_at = $4, expires_at = $5, template_slug = $6, paused_image_id = $7`,
+		sb.ID, sb.ContainerID, sb.Status, sb.CreatedAt, sb.ExpiresAt, sb.TemplateSlug, sb.PausedImageID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save sandbox: %w", err)
@@ -63,9 +66,9 @@ func (s *Store) Save(ctx context.Context, sb *Sandbox) error {
 func (s *Store) Get(ctx context.Context, id string) (*Sandbox, error) {
 	var sb Sandbox
 	err := s.pool.QueryRow(ctx,
-		`SELECT id, container_id, status, created_at, expires_at, template_slug FROM sandboxes WHERE id = $1`,
+		`SELECT id, container_id, status, created_at, expires_at, template_slug, paused_image_id FROM sandboxes WHERE id = $1`,
 		id,
-	).Scan(&sb.ID, &sb.ContainerID, &sb.Status, &sb.CreatedAt, &sb.ExpiresAt, &sb.TemplateSlug)
+	).Scan(&sb.ID, &sb.ContainerID, &sb.Status, &sb.CreatedAt, &sb.ExpiresAt, &sb.TemplateSlug, &sb.PausedImageID)
 
 	if err == pgx.ErrNoRows {
 		return nil, nil
