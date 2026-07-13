@@ -68,7 +68,7 @@ cage/
 
 Cage exposes a REST API that manages the lifecycle of sandboxes. Each sandbox currently maps 1:1 to a Docker container, with an in-memory (soon Postgres-backed) store tracking metadata.
 
-<img width="6438" height="3579" alt="image" src="https://github.com/user-attachments/assets/5495eb24-523e-47d3-b1a0-b6482a64ec08" />
+<img width="4415" height="3042" alt="image" src="https://github.com/user-attachments/assets/20dfdd74-b457-4456-a145-b16c73c708f2" />
 
 ## Getting Started
 
