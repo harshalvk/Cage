@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -75,6 +76,16 @@ func (m *MockDockerClient) CopyFromContainer(ctx context.Context, containerID, s
 	return args.Get(0).(io.ReadCloser), args.Get(1).(container.PathStat), args.Error(2)
 }
 
+func (m *MockDockerClient) ContainerCommit(ctx context.Context, containerID string, options container.CommitOptions) (types.IDResponse, error) {
+	args := m.Called(ctx, containerID, options)
+	return args.Get(0).(types.IDResponse), args.Error(1)
+}
+
+func (m *MockDockerClient) ImageRemove(ctx context.Context, imageID string, options image.RemoveOptions) ([]image.DeleteResponse, error) {
+	args := m.Called(ctx, imageID, options)
+	return args.Get(0).([]image.DeleteResponse), args.Error(1)
+}
+
 func TestCreateSandbox_Success(t *testing.T) {
 	mockClient := new(MockDockerClient)
 
@@ -90,5 +101,98 @@ func TestCreateSandbox_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "fake-container-id", id)
+	mockClient.AssertExpectations(t)
+}
+
+func TestPauseSandbox_Success(t *testing.T) {
+	mockClient := new(MockDockerClient)
+
+	mockClient.On("ContainerCommit", mock.Anything, "container-1", mock.Anything).Return(types.IDResponse{ID: "image-abc"}, nil)
+
+	mockClient.On("ContainerStop", mock.Anything, "container-1", mock.Anything).Return(nil)
+
+	mockClient.On("ContainerRemove", mock.Anything, "container-1", mock.Anything).Return(nil)
+
+	sm := NewSandboxManagerWithClient(mockClient)
+
+	imageID, err := sm.PauseSandbox(context.Background(), "container-1")
+
+	require.NoError(t, err)
+	assert.Equal(t, "image-abc", imageID)
+	mockClient.AssertExpectations(t)
+}
+
+func TestPauseSandbox_CommitFails(t *testing.T) {
+	mockclient := new(MockDockerClient)
+
+	mockclient.On("ContainerCommit", mock.Anything, "container-1", mock.Anything).Return(types.IDResponse{}, errors.New("commit failed"))
+
+	sm := NewSandboxManagerWithClient(mockclient)
+
+	_, err := sm.PauseSandbox(context.Background(), "container-1")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to commit container")
+
+	// container stop/remove should never be called if commit fails
+	mockclient.AssertNotCalled(t, "ContainerStop", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestPauseSandbox_StopFails_DoesNotRemove(t *testing.T) {
+	mockClient := new(MockDockerClient)
+
+	mockClient.On("ContainerCommit", mock.Anything, "container-1", mock.Anything).Return(types.IDResponse{ID: "image-abc"}, nil)
+
+	mockClient.On("ContainerStop", mock.Anything, "container-1", mock.Anything).Return(errors.New("stop failed"))
+
+	sm := NewSandboxManagerWithClient(mockClient)
+
+	_, err := sm.PauseSandbox(context.Background(), "container-1")
+
+	assert.Error(t, err)
+
+	// if stop fails, we should never attempt to remove the container - verifies fail-safe ordering
+	mockClient.AssertNotCalled(t, "ContainerRemove", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestResumeSandbox_Success(t *testing.T) {
+	mockClient := new(MockDockerClient)
+
+	mockClient.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(container.CreateResponse{ID: "new-container-1"}, nil)
+
+	mockClient.On("ContainerStart", mock.Anything, "new-container-1", mock.Anything).Return(nil)
+
+	sm := NewSandboxManagerWithClient(mockClient)
+
+	containerID, err := sm.ResumeSandbox(context.Background(), "image-abc")
+
+	require.NoError(t, err)
+	assert.Equal(t, "new-container-1", containerID)
+	mockClient.AssertExpectations(t)
+}
+
+func TestResumeSandbox_CreateFails(t *testing.T) {
+	mockClient := new(MockDockerClient)
+
+	mockClient.On("ContainerCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(container.CreateResponse{}, errors.New("create failed"))
+
+	sm := NewSandboxManagerWithClient(mockClient)
+
+	_, err := sm.ResumeSandbox(context.Background(), "image-abc")
+
+	assert.Error(t, err)
+	mockClient.AssertNotCalled(t, "ContainerStart", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestRemoveImage_Success(t *testing.T) {
+	mockClient := new(MockDockerClient)
+
+	mockClient.On("ImageRemove", mock.Anything, "image-abc", mock.Anything).Return([]image.DeleteResponse{}, nil)
+
+	sm := NewSandboxManagerWithClient(mockClient)
+
+	err := sm.RemoveImage(context.Background(), "image-abc")
+
+	require.NoError(t, err)
 	mockClient.AssertExpectations(t)
 }
