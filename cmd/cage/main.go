@@ -70,6 +70,8 @@ func main() {
 		r.Post("/{id}/exec", api.ExecCommand)
 		r.Post("/{id}/files", api.WriteFile)
 		r.Get("/{id}/files", api.ReadFile)
+		r.Post("/{id}/pause", api.PauseSandbox)
+		r.Post("/{id}/resume", api.ResumeSandbox)
 	})
 
 	log.Println("listening on :8080")
