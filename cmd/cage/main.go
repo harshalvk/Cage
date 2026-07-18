@@ -86,5 +86,9 @@ func main() {
 	})
 
 	log.Println("listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+
+	if err := http.ListenAndServe(":8080", r); err != nil {
+		log.Printf("server failed: %v", err)
+		return
+	}
 }
