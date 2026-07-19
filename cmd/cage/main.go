@@ -13,6 +13,7 @@ import (
 	"github.com/harshalvk/cage/internal/cache"
 	"github.com/harshalvk/cage/internal/config"
 	"github.com/harshalvk/cage/internal/db"
+	"github.com/harshalvk/cage/internal/pool"
 	"github.com/harshalvk/cage/internal/reaper"
 	"github.com/harshalvk/cage/internal/reconcile"
 	"github.com/harshalvk/cage/internal/sandbox"
@@ -58,7 +59,26 @@ func main() {
 	reaper := reaper.NewReaper(sm, store, 5*time.Second)
 	go reaper.Start(ctx)
 
-	api := api.NewAPI(sm, store, cfg.SandboxTTL)
+	templates, err := store.ListTemplate(ctx)
+	if err != nil {
+		log.Printf("failed to list templates: %v", err)
+		return
+	}
+
+	poolConfigs := make([]pool.TemplateConfig, 0, len(templates))
+	for _, t := range templates {
+		poolConfigs = append(poolConfigs, pool.TemplateConfig{
+			Slug:  t.Slug,
+			Image: t.Image,
+			Size:  cfg.WarmPoolSize,
+		})
+	}
+
+	warmPool := pool.New(sm, poolConfigs)
+	warmPool.Start(ctx)
+	log.Println("warm pool ready, starting server")
+
+	api := api.NewAPI(sm, store, cfg.SandboxTTL, warmPool)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
