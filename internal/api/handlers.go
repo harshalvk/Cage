@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/harshalvk/cage/internal/pool"
 	"github.com/harshalvk/cage/internal/sandbox"
 	"github.com/harshalvk/cage/internal/store"
 )
@@ -18,6 +19,7 @@ type API struct {
 	sm         *sandbox.SandboxManager
 	store      *store.Store
 	sandboxTTL time.Duration
+	pool       *pool.Pool
 }
 
 type ExecRequest struct {
@@ -32,8 +34,8 @@ type CreateSandboxRequest struct {
 	Template string `json:"template"`
 }
 
-func NewAPI(sm *sandbox.SandboxManager, store *store.Store, sandboxTTL time.Duration) *API {
-	return &API{sm: sm, store: store, sandboxTTL: sandboxTTL}
+func NewAPI(sm *sandbox.SandboxManager, store *store.Store, sandboxTTL time.Duration, p *pool.Pool) *API {
+	return &API{sm: sm, store: store, sandboxTTL: sandboxTTL, pool: p}
 }
 
 func (a *API) CreateSandbox(w http.ResponseWriter, r *http.Request) {
@@ -55,10 +57,16 @@ func (a *API) CreateSandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	containerID, err := a.sm.CreateSandbox(ctx, tmpl.Image)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	var containerID string
+	var fromPool bool
+
+	if containerID, fromPool = a.pool.Take(ctx, tmpl.Slug); !fromPool {
+		// cold path - pool was empty, pay the full create cost
+		containerID, err = a.sm.CreateSandbox(ctx, tmpl.Image)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	sb := &store.Sandbox{
@@ -75,6 +83,7 @@ func (a *API) CreateSandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("X-Sandbox-Warm-Start", fmt.Sprintf("%t", fromPool)) // useful for debugging/measuring
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(sb); err != nil {
@@ -114,7 +123,7 @@ func (a *API) DeleteSandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if sb != nil {
+	if sb == nil {
 		http.Error(w, "sandbox not found", http.StatusNotFound)
 		return
 	}
