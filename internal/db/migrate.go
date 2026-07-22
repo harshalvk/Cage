@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -17,7 +17,7 @@ func RunMigrations(databaseURL string) error {
 
 	defer func() {
 		if _, err := m.Close(); err != nil {
-			log.Printf("failed to close migrate instance: %v", err)
+			slog.Error("failed to close migrate instance: %v", "error", err)
 		}
 	}()
 

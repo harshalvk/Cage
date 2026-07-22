@@ -3,7 +3,7 @@ package testutil
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"path/filepath"
 	"runtime"
 	"time"
@@ -38,10 +38,10 @@ func RunMigrations(databaseURL string) error {
 	defer func() {
 		sourceErr, dbErr := m.Close()
 		if sourceErr != nil {
-			log.Printf("migrate source close error: %v", sourceErr)
+			slog.Error("migrate source close error: %v", "db_migration_source_error", sourceErr)
 		}
 		if dbErr != nil {
-			log.Printf("migrate db close error: %v", dbErr)
+			slog.Error("migrate db close error: %v", "database_close_error", dbErr)
 		}
 	}()
 
@@ -60,7 +60,7 @@ func waitForDB(databaseURL string, timeout time.Duration) error {
 		if err == nil {
 			pingErr := db.Ping()
 			if closeErr := db.Close(); closeErr != nil {
-				log.Printf("db close error: %v", closeErr)
+				slog.Error("db close error: %v", "database_close_error", closeErr)
 			}
 			if pingErr == nil {
 				return nil

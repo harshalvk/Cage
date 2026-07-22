@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"time"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -50,12 +50,12 @@ func (sm *SandboxManager) CreateSandbox(ctx context.Context, imageRef string) (s
 
 	defer func() {
 		if err := reader.Close(); err != nil {
-			log.Printf("failed to close reader: %v", err)
+			slog.Error("failed to close reader: %v", "error", err)
 		}
 	}()
 
 	if _, err := io.Copy(io.Discard, reader); err != nil {
-		log.Printf("failed to drain image pull output: %v", err)
+		slog.Error("failed to drain image pull output: %v", "error", err)
 	} // drain pull progress output
 
 	// crate container — sleep infinity keeps it alive so we can exec into it later
@@ -161,7 +161,7 @@ func (sm *SandboxManager) ReadFile(ctx context.Context, containerID, srcPath str
 	}
 	defer func() {
 		if err := reader.Close(); err != nil {
-			log.Printf("failed to close container copy reader: %v", err)
+			slog.Error("failed to close container copy reader: %v", "error", err)
 		}
 	}()
 

@@ -17,6 +17,7 @@ type Config struct {
 	ReaperInterval time.Duration
 	SandboxTTL     time.Duration
 	WarmPoolSize   int
+	LogLevel       string
 }
 
 func LoadConfig() (*Config, error) {
@@ -29,6 +30,7 @@ func LoadConfig() (*Config, error) {
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 		RedisURL:    getEnv("REDIS_URL", "redis://localhost:6379"),
 	}
+	cfg.LogLevel = getEnv("LOG_LEVEL", "info")
 
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")

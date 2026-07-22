@@ -2,7 +2,7 @@ package reconcile
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/harshalvk/cage/internal/sandbox"
 	"github.com/harshalvk/cage/internal/store"
@@ -21,13 +21,13 @@ func Reconcile(ctx context.Context, sm *sandbox.SandboxManager, st *store.Store)
 
 		running, err := sm.IsRunning(ctx, sb.ContainerID)
 		if err != nil {
-			log.Printf("reconcile: failed to check sandbox %s: %v", sb.ID, err)
+			slog.Error("reconcile: failed to check sandbox %s: %v", "sandbox_id", sb.ID, "error", err)
 		}
 		if !running {
-			log.Printf("reconcile: sanbox %s marked running in DB but container is gone — cleaning up", sb.ID)
+			slog.Info("reconcile: sanbox %s marked running in DB but container is gone — cleaning up", "sandbox_id", sb.ID)
 
 			if err := st.Delete(ctx, sb.ID); err != nil {
-				log.Printf("reconcile: failed to delete sandbox %s: %v", sb.ID, err)
+				slog.Error("reconcile: failed to delete sandbox %s: %v", "sandbox_id", sb.ID, "error", err)
 			}
 		}
 	}

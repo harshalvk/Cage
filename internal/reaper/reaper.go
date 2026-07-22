@@ -3,8 +3,10 @@ package reaper
 import (
 	"context"
 	"log"
+	"log/slog"
 	"time"
 
+	"github.com/harshalvk/cage/internal/metrics"
 	"github.com/harshalvk/cage/internal/sandbox"
 	"github.com/harshalvk/cage/internal/store"
 )
@@ -36,20 +38,21 @@ func (r *Reaper) Start(ctx context.Context) {
 
 func (r *Reaper) reap(ctx context.Context) {
 	expired, err := r.store.ListExpired(ctx)
+	metrics.SandboxesReaped.Inc()
 	if err != nil {
-		log.Printf("reaper: failed to list expired sandboxes: %v", err)
+		slog.Error("reaper: failed to list expired sandboxes: %v", "error", err)
 		return
 	}
 
 	for _, sb := range expired {
-		log.Printf("reaper: killing expired sandbox %s", sb.ID)
+		slog.Info("reaper: killing expired sandbox %s", "sandbox_id", sb.ID)
 		if err := r.sm.KillSandbox(ctx, sb.ContainerID); err != nil {
-			log.Printf("reaper: failed to kill container for sandbox %s: %v", sb.ID, err)
+			slog.Error("reaper: failed to kill container for sandbox %s: %v", "sandbox_id", sb.ID, "error", err)
 			continue
 		}
 
 		if err := r.store.Delete(ctx, sb.ID); err != nil {
-			log.Printf("reaper: failed to delete sandbox %s from store: %v", sb.ID, err)
+			slog.Error("reaper: failed to delete sandbox %s from store: %v", "sandbox_id", sb.ID, "error", err)
 		}
 	}
 }

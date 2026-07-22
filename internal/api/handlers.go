@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -87,7 +87,7 @@ func (a *API) CreateSandbox(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(sb); err != nil {
-		log.Printf("failed to encode response: %v", err)
+		slog.Error("failed to encode response: %v", "error", err)
 	}
 }
 
@@ -111,7 +111,7 @@ func (a *API) GetSandbox(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(sb); err != nil {
-		log.Printf("failed to encode response: %v", err)
+		slog.Error("failed to encode response: %v", "error", err)
 	}
 }
 
@@ -153,7 +153,7 @@ func (a *API) ListSandboxes(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(sandboxes); err != nil {
-		log.Printf("failed to encode response: %v", err)
+		slog.Error("failed to encode response: %v", "error", err)
 	}
 }
 
@@ -193,7 +193,7 @@ func (a *API) ExecCommand(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		log.Printf("failed to encode response: %v", err)
+		slog.Error("failed to encode response: %v", "error", err)
 	}
 }
 
@@ -265,7 +265,7 @@ func (a *API) ReadFile(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	if _, err := w.Write(content); err != nil {
-		log.Printf("failed to write response: %v", err)
+		slog.Error("failed to write response: %v", "error", err)
 	}
 }
 
@@ -277,7 +277,7 @@ func (a *API) ListTemplates(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(templates); err != nil {
-		log.Printf("failed to encode response: %v", err)
+		slog.Error("failed to encode response: %v", "error", err)
 	}
 }
 
@@ -314,7 +314,7 @@ func (a *API) PauseSandbox(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(sb); err != nil {
-		log.Printf("failed to encode response: %v", err)
+		slog.Error("failed to encode response: %v", "error", err)
 	}
 }
 
@@ -360,12 +360,12 @@ func (a *API) ResumeSandbox(w http.ResponseWriter, r *http.Request) {
 	// dont block the response on it, and a failure there shouldn't fail the resume
 	go func() {
 		if err := a.sm.RemoveImage(context.Background(), oldImageID); err != nil {
-			log.Printf("failed to clean up paused image %s: %v", oldImageID, err)
+			slog.Error("failed to clean up paused image %s: %v", "image_id", oldImageID, "error", err)
 		}
 	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(sb); err != nil {
-		log.Printf("failed to encode response: %v", err)
+		slog.Error("failed to encode response: %v", "error", err)
 	}
 }
