@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/harshalvk/cage/internal/cache"
 	"github.com/harshalvk/cage/internal/config"
 	"github.com/harshalvk/cage/internal/db"
+	"github.com/harshalvk/cage/internal/logging"
 	"github.com/harshalvk/cage/internal/pool"
 	"github.com/harshalvk/cage/internal/reaper"
 	"github.com/harshalvk/cage/internal/reconcile"
@@ -27,6 +29,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("config error: %v", err)
 	}
+
+	logger := logging.New(cfg.LogLevel)
+	slog.SetDefault(logger)
+
+	logger.Info("starting cage", "port", cfg.Port, "warm_pool_size", cfg.WarmPoolSize)
 
 	if err := db.RunMigrations(cfg.DatabaseURL); err != nil {
 		log.Fatalf("migration error: %v", err)
@@ -48,12 +55,12 @@ func main() {
 	}
 	defer func() {
 		if err := c.Close(); err != nil {
-			log.Printf("failed to close container: %v", err)
+			slog.Error("failed to close container: %v", "error", err)
 		}
 	}()
 
 	if err := reconcile.Reconcile(ctx, sm, store); err != nil {
-		log.Printf("reconcile failed: %v", err)
+		slog.Error("reconcile failed: %v", "error", err)
 	}
 
 	reaper := reaper.NewReaper(sm, store, 5*time.Second)
@@ -61,7 +68,7 @@ func main() {
 
 	templates, err := store.ListTemplate(ctx)
 	if err != nil {
-		log.Printf("failed to list templates: %v", err)
+		slog.Error("failed to list templates: %v", "error", err)
 		return
 	}
 
@@ -78,37 +85,39 @@ func main() {
 	warmPool.Start(ctx)
 	log.Println("warm pool ready, starting server")
 
-	api := api.NewAPI(sm, store, cfg.SandboxTTL, warmPool)
+	a := api.NewAPI(sm, store, cfg.SandboxTTL, warmPool)
 
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.RequestID)
+	r.Use(api.RequestLogger)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-			log.Printf("failed to encode health response: %v", err)
+			slog.Error("failed to encode health response: %v", "error", err)
 		}
 	})
 
-	r.Get("/templates", api.ListTemplates)
+	r.Get("/templates", a.ListTemplates)
 
 	r.Route("/sandboxes", func(r chi.Router) {
-		r.Use(api.AuthMiddleware(store, c))
-		r.Post("/", api.CreateSandbox)
-		r.Get("/", api.ListSandboxes)
-		r.Get("/{id}", api.GetSandbox)
-		r.Delete("/{id}", api.DeleteSandbox)
-		r.Post("/{id}/exec", api.ExecCommand)
-		r.Post("/{id}/files", api.WriteFile)
-		r.Get("/{id}/files", api.ReadFile)
-		r.Post("/{id}/pause", api.PauseSandbox)
-		r.Post("/{id}/resume", api.ResumeSandbox)
+		r.Use(a.AuthMiddleware(store, c))
+		r.Post("/", a.CreateSandbox)
+		r.Get("/", a.ListSandboxes)
+		r.Get("/{id}", a.GetSandbox)
+		r.Delete("/{id}", a.DeleteSandbox)
+		r.Post("/{id}/exec", a.ExecCommand)
+		r.Post("/{id}/files", a.WriteFile)
+		r.Get("/{id}/files", a.ReadFile)
+		r.Post("/{id}/pause", a.PauseSandbox)
+		r.Post("/{id}/resume", a.ResumeSandbox)
 	})
 
 	log.Println("listening on :8080")
 
 	if err := http.ListenAndServe(":8080", r); err != nil {
-		log.Printf("server failed: %v", err)
+		slog.Error("server failed: %v", "error", err)
 		return
 	}
 }
