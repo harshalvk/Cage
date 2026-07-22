@@ -20,6 +20,7 @@ import (
 	"github.com/harshalvk/cage/internal/reconcile"
 	"github.com/harshalvk/cage/internal/sandbox"
 	"github.com/harshalvk/cage/internal/store"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -100,6 +101,7 @@ func main() {
 	})
 
 	r.Get("/templates", a.ListTemplates)
+	r.Handle("/metrics", promhttp.Handler())
 
 	r.Route("/sandboxes", func(r chi.Router) {
 		r.Use(a.AuthMiddleware(store, c))
