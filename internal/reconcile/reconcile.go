@@ -4,11 +4,26 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/harshalvk/cage/internal/lock"
 	"github.com/harshalvk/cage/internal/sandbox"
 	"github.com/harshalvk/cage/internal/store"
 )
 
-func Reconcile(ctx context.Context, sm *sandbox.SandboxManager, st *store.Store) error {
+func Reconcile(ctx context.Context, sm *sandbox.SandboxManager, st *store.Store, l *lock.DistributedLock) error {
+	acquired, err := l.TryAcquire(ctx)
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		slog.Info("reconcile: another replica is already reconciling, skipping")
+		return nil
+	}
+	defer func() {
+		if err := l.Release(ctx); err != nil {
+			slog.Error("reconcile: failed to release lock", "error", err)
+		}
+	}()
+
 	all, err := st.List(ctx)
 	if err != nil {
 		return err
