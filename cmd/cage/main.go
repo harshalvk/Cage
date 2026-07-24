@@ -19,6 +19,7 @@ import (
 	"github.com/harshalvk/cage/internal/cache"
 	"github.com/harshalvk/cage/internal/config"
 	"github.com/harshalvk/cage/internal/db"
+	"github.com/harshalvk/cage/internal/lock"
 	"github.com/harshalvk/cage/internal/logging"
 	"github.com/harshalvk/cage/internal/pool"
 	"github.com/harshalvk/cage/internal/ratelimit"
@@ -74,11 +75,14 @@ func run() error {
 		}
 	}()
 
-	if err := reconcile.Reconcile(ctx, sm, st); err != nil {
+	reaperLock := lock.New(c.RawClient(), "reaper", 30*time.Second)
+	reconcileLock := lock.New(c.RawClient(), "reconcile", 60*time.Second)
+
+	if err := reconcile.Reconcile(ctx, sm, st, reconcileLock); err != nil {
 		slog.Error("reconcile failed", "error", err)
 	}
 
-	rp := reaper.NewReaper(sm, st, cfg.ReaperInterval)
+	rp := reaper.NewReaper(sm, st, cfg.ReaperInterval, reaperLock)
 	go rp.Start(ctx)
 
 	templates, err := st.ListTemplate(ctx)
