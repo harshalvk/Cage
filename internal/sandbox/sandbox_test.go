@@ -86,6 +86,11 @@ func (m *MockDockerClient) ImageRemove(ctx context.Context, imageID string, opti
 	return args.Get(0).([]image.DeleteResponse), args.Error(1)
 }
 
+func (m *MockDockerClient) ContainerExecResize(ctx context.Context, execID string, options container.ResizeOptions) error {
+	args := m.Called(ctx, execID, options)
+	return args.Error(0)
+}
+
 func TestCreateSandbox_Success(t *testing.T) {
 	mockClient := new(MockDockerClient)
 
