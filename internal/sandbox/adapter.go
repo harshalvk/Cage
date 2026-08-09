@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/harshalvk/cage/internal/backend"
 )
 
 // BackendAdapter wraps SandboxManager (the tested, Docker-SDK-facing type)
@@ -133,31 +135,21 @@ func (a *BackendAdapter) ResumeSandbox(ctx context.Context, sandboxID, imageID s
 	return nil
 }
 
-// --- backend.ImageCleaner ---
-
 func (a *BackendAdapter) RemoveImage(ctx context.Context, imageID string) error {
 	return a.sm.RemoveImage(ctx, imageID)
 }
 
-// --- backend.WarmAdopter ---
-
-/*
-AdoptWarmResource re-registers a warm pool's placeholder sandbox id under
-the real sandbox id chosen by the api layer. the underlying container is
-already running - no provisioning happens here, only a rename of the
-internal id->container mapping
-*/
-func (a *BackendAdapter) AdoptWarmResource(ctx context.Context, sandboxID, placeholderID string) error {
-	a.mu.Lock()
-	containerID, ok := a.containers[placeholderID]
-	if ok {
-		delete(a.containers, placeholderID)
-		a.containers[sandboxID] = containerID
+func (a *BackendAdapter) OpenShell(ctx context.Context, sandboxID string) (backend.Shell, error) {
+	containerID, err := a.containerFor(sandboxID)
+	if err != nil {
+		return nil, err
 	}
-	a.mu.Unlock()
+	return a.sm.OpenShell(ctx, containerID)
+}
 
-	if !ok {
-		return fmt.Errorf("no container mapped for warm placeholder %s", placeholderID)
-	}
+func (a *BackendAdapter) AdoptWarmResource(ctx context.Context, sandboxID, containerID string) error {
+	// The container is already running (created ahead of time by the warm
+	// pool) — just register the mapping, no provisioning needed.
+	a.register(sandboxID, containerID)
 	return nil
 }

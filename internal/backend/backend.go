@@ -12,7 +12,10 @@
 // assertions through business logic.
 package backend
 
-import "context"
+import (
+	"context"
+	"io"
+)
 
 // SandboxBackend is the required baseline every isolation backend must
 // implement. internal/api, internal/reaper, and internal/reconcile all
@@ -93,4 +96,30 @@ func AsImageCleaner(b SandboxBackend) (ImageCleaner, bool) {
 func AsWarmAdopter(b SandboxBackend) (WarmAdopter, bool) {
 	w, ok := b.(WarmAdopter)
 	return w, ok
+}
+
+// Shell represents one live, interactive terminal session inside a
+// sandbox - a real pty, not the one-shot request/response of ExecCommand
+// reads/writes stream continuously until Close is called
+type Shell interface {
+	io.Reader
+	io.Writer
+	// Resize informs the backend's PTY of a terminal size change --
+	// needed for full-screen programs (vim, less, htop) to render correctly
+	Resize(cols, rows uint16) error
+	Close() error
+}
+
+// Interactive is an optional capability: backends that can open a real PTY
+// session implement this. not every backedn can -- check with AsInteractive
+type Interactive interface {
+	// OpenShell starts an interactive shell session inside the sandbox
+	// returning a live bidirectional stream
+	OpenShell(ctx context.Context, sandboxID string) (Shell, error)
+}
+
+// AsInteractive checks whether b supports interactive shell sessions
+func AsInteractive(b SandboxBackend) (Interactive, bool) {
+	i, ok := b.(Interactive)
+	return i, ok
 }

@@ -170,6 +170,7 @@ func run() error {
 		r.Get("/{id}/files", a.ReadFile)
 		r.Post("/{id}/pause", a.PauseSandbox)
 		r.Post("/{id}/resume", a.ResumeSandbox)
+		r.Get("/{id}/shell", a.OpenShellSession)
 	})
 
 	srv := &http.Server{

@@ -25,4 +25,5 @@ type DockerClient interface {
 	CopyFromContainer(ctx context.Context, containerID, srcPath string) (io.ReadCloser, container.PathStat, error)
 	ContainerCommit(ctx context.Context, containerID string, options container.CommitOptions) (container.CommitResponse, error)
 	ImageRemove(ctx context.Context, imageID string, options image.RemoveOptions) ([]image.DeleteResponse, error)
+	ContainerExecResize(ctx context.Context, execID string, options container.ResizeOptions) error
 }
