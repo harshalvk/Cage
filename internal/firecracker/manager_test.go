@@ -3,11 +3,13 @@ package firecracker
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/harshalvk/cage/internal/backend"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,6 +26,30 @@ func (f *fakeProcess) Wait() error { return nil }
 
 type fakeAPI struct {
 	failAt string // which method should return an error, "" for none
+}
+
+type fakeShell struct {
+	written [][]byte
+	resized [2]uint16
+	closed  bool
+}
+
+func (f *fakeShell) Read(p []byte) (int, error) {
+	msg := []byte("fake shell output")
+	n := copy(p, msg)
+	return n, io.EOF // one read, then EOF — enough to prove the plumbing works
+}
+func (f *fakeShell) Write(p []byte) (int, error) {
+	f.written = append(f.written, append([]byte(nil), p...))
+	return len(p), nil
+}
+func (f *fakeShell) Resize(cols, rows uint16) error {
+	f.resized = [2]uint16{cols, rows}
+	return nil
+}
+func (f *fakeShell) Close() error {
+	f.closed = true
+	return nil
 }
 
 func (f *fakeAPI) setMachineConfig(ctx context.Context, vcpu, mem int64) error {
@@ -123,6 +149,7 @@ func newTestManager(t *testing.T, apiFailAt string, vsockErr error) *Firecracker
 		spawnProcess,
 		func(socketPath string) fcAPI { return &fakeAPI{failAt: apiFailAt} },
 		func(udsPath string) fcVsock { return &fakeVsock{readyErr: vsockErr} },
+		func(udsPath string) (backend.Shell, error) { return &fakeShell{}, nil },
 	)
 }
 
@@ -345,4 +372,32 @@ func TestRemoveImage_NonexistentRefIsNotAnError(t *testing.T) {
 
 	err := mgr.RemoveImage(context.Background(), filepath.Join(mgr.cfg.RunDir, "pauses", "never-existed"))
 	assert.NoError(t, err, "removing an already-gone pause ref should be a no-op, not an error")
+}
+
+func TestOpenShell_Success(t *testing.T) {
+	mgr := newTestManager(t, "", nil)
+	require.NoError(t, mgr.CreateSandbox(context.Background(), "sb-1", "base"))
+
+	shell, err := mgr.OpenShell(context.Background(), "sb-1")
+	require.NoError(t, err)
+	require.NotNil(t, shell)
+
+	n, err := shell.Write([]byte("echo hi\n"))
+	require.NoError(t, err)
+	assert.Equal(t, 8, n)
+
+	require.NoError(t, shell.Resize(80, 24))
+
+	buf := make([]byte, 64)
+	n, _ = shell.Read(buf)
+	assert.Contains(t, string(buf[:n]), "fake shell output")
+
+	require.NoError(t, shell.Close())
+}
+
+func TestOpenShell_UnknownSandbox(t *testing.T) {
+	mgr := newTestManager(t, "", nil)
+
+	_, err := mgr.OpenShell(context.Background(), "does-not-exist")
+	assert.Error(t, err)
 }
