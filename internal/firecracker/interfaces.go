@@ -3,6 +3,8 @@ package firecracker
 import (
 	"context"
 	"time"
+
+	"github.com/harshalvk/cage/internal/backend"
 )
 
 // fcAPI is the subset of apiClient's methods FirecrackerManager depends on
@@ -33,3 +35,8 @@ type processHandle interface {
 	Kill() error
 	Wait() error
 }
+
+// shellDialerFunc abstracts opening a persistent shell connection -
+// injectable the same way fcAPI/fcVsock are, so tests can fake it without
+// real vsock/KVM
+type shellDialerFunc func(udsPath string) (backend.Shell, error)
