@@ -45,6 +45,10 @@ func runShell(cmd *cobra.Command, args []string) error {
 		if resp != nil && resp.StatusCode == http.StatusNotImplemented {
 			return fmt.Errorf("interactive shells are not supported on this sandbox's isolation backend")
 		}
+		return fmt.Errorf("failed to connect: %w", err)
+	}
+	if conn == nil {
+		return fmt.Errorf("websocket dial returned no connection and no error — this should not happen")
 	}
 	defer conn.CloseNow()
 
