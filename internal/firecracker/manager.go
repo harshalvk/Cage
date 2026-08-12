@@ -53,7 +53,7 @@ type FirecrackerManager struct {
 	// Injectable dependencies - default to real implementations in
 	// NewFirecrackerManager, overridden by tests via the unexporeted
 	// constructor NewFirecracekrManagerForTest
-	spawnProcess func(ctx context.Context, bin, apiSocket string) (processHandle, error)
+	spawnProcess func(bin, apiSocket string) (processHandle, error)
 	newAPI       func(socketPath string) fcAPI
 	newVsock     func(udsPath string) fcVsock
 	newShell     shellDialerFunc
@@ -98,7 +98,7 @@ func NewFirecrackerManager(cfg Config) (*FirecrackerManager, error) {
 func NewFirecrackerManagerForTest(
 	cfg Config,
 	rootfs *RootfsManager,
-	spawnProcess func(ctx context.Context, bin, apiSocket string) (processHandle, error),
+	spawnProcess func(bin, apiSocket string) (processHandle, error),
 	newAPI func(socketPath string) fcAPI,
 	newVsock func(udsPath string) fcVsock,
 	newShell shellDialerFunc,
@@ -114,8 +114,8 @@ func NewFirecrackerManagerForTest(
 	}
 }
 
-func realSpawnProcess(ctx context.Context, bin, apiSocket string) (processHandle, error) {
-	cmd := exec.CommandContext(ctx, bin, "--api-sock", apiSocket)
+func realSpawnProcess(bin, apiSocket string) (processHandle, error) {
+	cmd := exec.Command(bin, "--api-sock", apiSocket)
 	logPath := apiSocket + ".log"
 	if logFile, err := os.Create(logPath); err == nil {
 		cmd.Stdout = logFile
@@ -162,7 +162,7 @@ func (m *FirecrackerManager) CreateSandbox(ctx context.Context, sandboxID, templ
 	removeFileIfExists(apiSocket)
 	removeFileIfExists(vsockUDS)
 
-	process, err := m.spawnProcess(ctx, m.cfg.FirecrackerBin, apiSocket) // ← was: exec.CommandContext(...) + cmd.Start()
+	process, err := m.spawnProcess(m.cfg.FirecrackerBin, apiSocket) // ← was: exec.CommandContext(...) + cmd.Start()
 	if err != nil {
 		if cerr := m.rootfs.Cleanup(sandboxID); cerr != nil {
 			slog.Warn("firecracker: rootfs cleanup failed after spawn failure", "error", cerr)
@@ -436,7 +436,7 @@ func (m *FirecrackerManager) ResumeSandbox(ctx context.Context, sandboxID, pause
 	removeFileIfExists(apiSocket)
 	removeFileIfExists(vsockUDS)
 
-	process, err := m.spawnProcess(ctx, m.cfg.FirecrackerBin, apiSocket)
+	process, err := m.spawnProcess(m.cfg.FirecrackerBin, apiSocket)
 	if err != nil {
 		return fmt.Errorf("failed to start firecracker process for resume: %w", err)
 	}

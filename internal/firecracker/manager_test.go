@@ -136,7 +136,7 @@ func newTestManager(t *testing.T, apiFailAt string, vsockErr error) *Firecracker
 	rootfs, err := NewRootfsManager(baseDir, filepath.Join(runDir, "rootfs"))
 	require.NoError(t, err)
 
-	spawnProcess := func(ctx context.Context, bin, apiSocket string) (processHandle, error) {
+	spawnProcess := func(bin, apiSocket string) (processHandle, error) {
 		// Simulate the api socket "appearing" the way a real firecracker
 		// process would, since waitForSocket polls for the file on disk.
 		require.NoError(t, os.WriteFile(apiSocket, []byte{}, 0644))
