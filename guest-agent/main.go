@@ -167,6 +167,7 @@ func handleShellConn(conn io.ReadWriteCloser) {
 	}
 
 	cmd := exec.Command(shellPath)
+	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
 		log.Printf("failed to start pty: %v", err)
