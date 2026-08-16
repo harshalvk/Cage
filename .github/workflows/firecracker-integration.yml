@@ -1,0 +1,36 @@
+name: Firecracker Integration (Real KVM)
+
+on:
+  push:
+    branches: [stagging, master]
+    paths:
+      - "internal/firecracker/**"
+      - "gues-agent/**"
+  workflow_dispatch: {}
+
+jobs:
+  kvm-integration:
+    runs-on: [self-hosted, kvm]
+    timeout-minutes: 15
+    env:
+      FIRECRACKER_BIN: /usr/local/bin/firecracker
+      FIRECRACKER_KERNEL: /opt/cage-ci/kernel/vmlinux.bin
+      FIRECRACKER_ROOTFS_DIR: /opt/cage-ci/rootfs-base
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: Verify KVM access
+        run: |
+          if [ ! -e /dev/kvm ]; then
+            echo "::error::/dev/kvm not available on this runner"
+            exit 1
+          fi
+
+      - name: Run real-kvm integration tests
+        run: go test -tags kvm ./internal/firecracker/... -v -timeout 10m
