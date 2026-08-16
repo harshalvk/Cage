@@ -50,3 +50,6 @@ genkey:
 
 firecracker-build-rootfs:
 	./scripts/build-firecracker-rootfs.sh $(slug)
+
+test-firecracker-integration:
+	go test -tags kvm ./internal/firecracker/... -v -timeout 5m
