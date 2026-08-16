@@ -1,4 +1,5 @@
 <div align="center">
+<img width="120" height="120" alt="image" src="https://github.com/user-attachments/assets/a1123aca-8933-4a8e-b48f-7afa133b8425" />
 
 # Cage
 
@@ -9,7 +10,7 @@
 
 </div>
 
-<img width="1788" height="464" alt="image" src="https://github.com/user-attachments/assets/d463f5f5-9029-4a4f-8c18-2f03d5339ed4" />
+<img width="3536" height="840" alt="image" src="https://github.com/user-attachments/assets/255dab5f-7fda-4001-b747-74e75be778ad" />
 
 **Cage** is an open-source, self-hostable clone of [E2B](https://e2b.dev) — a backend service for spinning up secure, isolated sandboxes to run untrusted or AI-generated code. Built in Go.
 
@@ -161,20 +162,20 @@ go build -o cage .
 ### Install the CLI
 
 **macOS/Linux (Homebrew):**
-\`\`\`bash
+```bash
 brew install harshalvk/cage/cage
-\`\`\`
+```
 
 **Windows (Scoop):**
-\`\`\`powershell
+```powershell
 scoop bucket add cage https://github.com/harshalvk/scoop-cage
 scoop install cage
-\`\`\`
+```
 
 **Any platform (install script):**
-\`\`\`bash
+```bash
 curl -sSL https://raw.githubusercontent.com/harshalvk/cage/main/install.sh | bash
-\`\`\`
+```
 
 ### Use the SDK
 

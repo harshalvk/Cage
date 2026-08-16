@@ -47,3 +47,6 @@ clean:
 
 genkey:
 	go run ./cmd/genkey -name=$(name)
+
+firecracker-build-rootfs:
+	./scripts/build-firecracker-rootfs.sh $(slug)

@@ -75,25 +75,14 @@ template's rootfs is a manual process. Automating it (a
 `make firecracker-build-template slug=X` target) is a known gap, not yet
 built.
 
-## Building the base rootfs (debootstrap)
-
-The Firecracker quickstart demo rootfs is not suitable as a real sandbox
-base — it lacks a functioning dpkg/apt system entirely. Build a proper one
-instead:
+## Building the base rootfs
 
 \`\`\`bash
-sudo apt install -y debootstrap
-sudo debootstrap --arch=amd64 jammy ~/firecracker/rootfs-build http://archive.ubuntu.com/ubuntu
-echo "cage-sandbox" | sudo tee ~/firecracker/rootfs-build/etc/hostname
-echo "devpts /dev/pts devpts gid=5,mode=620,ptmxmode=666 0 0" | sudo tee -a ~/firecracker/rootfs-build/etc/fstab
-# + guest agent injection + systemd unit, same as before
-# + package into ext4, size generously (2GB+) up front
+export FIRECRACKER_ROOTFS_DIR=/path/to/your/rootfs-dir
+make firecracker-build-rootfs slug=base
 \`\`\`
 
-Known gotchas this build must account for:
-- `ptmxmode=666` in `/etc/fstab` — without it, PTY allocation fails silently and shell sessions get an EOF on connect.
-- Root auto-login via a `serial-getty@ttyS0.service.d` override, since debootstrap doesn't configure this by default.
-- The kernel (`vmlinux.bin`, 4.14) is older than jammy's userspace expects — works for basic use, watch for issues with newer syscall-dependent tools.
+This script handles debootstrap, the devpts/ptmx fix, root autologin, guest agent injection, and packaging — with verification at each step. See `scripts/build-firecracker-rootfs.sh` if you need to customize the base distro/version.
 
 ## Registering a template for Firecracker
 
@@ -115,8 +104,7 @@ UPDATE templates SET firecracker_rootfs_slug = 'my-slug' WHERE slug = 'my-templa
 - **Both backends cannot run simultaneously.** `ISOLATION_BACKEND` is a
   single global switch, not a per-sandbox choice.
 - **Snapshot/restore is tied to your Firecracker binary version.** Don't
-  upgrade the `firecracker` binary while sandboxes are paused — see ADR
-  0015.
+  upgrade the `firecracker` binary while sandboxes are paused — see ADR 0015.
 - **CI does not test this backend.** GitHub-hosted runners do not expose
   `/dev/kvm`; only the mocked unit tests in `internal/firecracker` run in
   CI. Real validation requires a local run against real KVM.
