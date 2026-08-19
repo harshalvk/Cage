@@ -23,7 +23,7 @@ type Sandbox struct {
 	Status        SandboxStatus `json:"status"`
 	CreatedAt     time.Time     `json:"created_at"`
 	ExpiresAt     time.Time     `json:"expires_at"`
-	TemplateSlug  string        `json:"template"`
+	TemplateSlug  string        `json:"template_slug"`
 	PausedImageID *string       `json:"-"`
 }
 
