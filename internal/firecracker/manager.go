@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,6 +34,7 @@ type vmInstance struct {
 	vsockUDS   string
 	rootfsPath string
 	vsock      fcVsock
+	guestIP    net.IP
 }
 
 // Config holds the paths and defaults FirecrackerManager needs at startup.
@@ -44,6 +46,7 @@ type Config struct {
 	VCPUCount      int64
 	MemSizeMiB     int64
 	BootTimeout    time.Duration
+	Network        *NetworkManager
 }
 
 type FirecrackerManager struct {
@@ -162,6 +165,18 @@ func (m *FirecrackerManager) CreateSandbox(ctx context.Context, sandboxID, templ
 	removeFileIfExists(apiSocket)
 	removeFileIfExists(vsockUDS)
 
+	var tapName string
+	var guestIP net.IP
+	if m.cfg.Network != nil && m.cfg.Network.cfg.Enabled {
+		tapName, guestIP, err = m.cfg.Network.AllocateTap(sandboxID)
+		if err != nil {
+			if cerr := m.rootfs.Cleanup(sandboxID); cerr != nil {
+				slog.Warn("firecracker: rootfs cleanup failed after network allocation failure", "error", cerr)
+			}
+			return fmt.Errorf("failed to allocate network: %w", err)
+		}
+	}
+
 	process, err := m.spawnProcess(m.cfg.FirecrackerBin, apiSocket) // ← was: exec.CommandContext(...) + cmd.Start()
 	if err != nil {
 		if cerr := m.rootfs.Cleanup(sandboxID); cerr != nil {
@@ -185,17 +200,31 @@ func (m *FirecrackerManager) CreateSandbox(ctx context.Context, sandboxID, templ
 		if cerr := m.rootfs.Cleanup(sandboxID); cerr != nil {
 			slog.Warn("firecracker: rootfs cleanup failed during rollback", "stage", stage, "error", cerr)
 		}
+		if guestIP != nil {
+			m.cfg.Network.ReleaseTap(sandboxID, guestIP)
+		}
 		return err
+	}
+
+	bootArgs := "console=ttyS0 reboot=k panic=1 pci=off"
+	if guestIP != nil {
+		gateway, _, _ := net.ParseCIDR(m.cfg.Network.cfg.BridgeCIDR)
+		bootArgs += fmt.Sprintf(" ip=%s::%s:255.255.255.0::eth0:off", guestIP, gateway)
 	}
 
 	if err := api.setMachineConfig(ctx, m.cfg.VCPUCount, m.cfg.MemSizeMiB); err != nil {
 		return rollback("machine-config", err)
 	}
-	if err := api.setBootSource(ctx, m.cfg.KernelPath, "console=ttyS0 reboot=k panic=1 pci=off"); err != nil {
+	if err := api.setBootSource(ctx, m.cfg.KernelPath, bootArgs); err != nil {
 		return rollback("boot-source", err)
 	}
 	if err := api.setRootDrive(ctx, rootfsPath); err != nil {
 		return rollback("root-drive", err)
+	}
+	if guestIP != nil {
+		if err := api.setNetworkInterface(ctx, tapName); err != nil {
+			return rollback("network-interface", err)
+		}
 	}
 	if err := api.setVsock(ctx, 3, vsockUDS); err != nil {
 		return rollback("vsock", err)
@@ -208,6 +237,12 @@ func (m *FirecrackerManager) CreateSandbox(ctx context.Context, sandboxID, templ
 	if err := vsock.waitReady(m.cfg.BootTimeout); err != nil {
 		return rollback("guest-agent-ready", fmt.Errorf("guest agent never became ready: %w", err))
 	}
+	if guestIP != nil && m.cfg.Network.cfg.DNSServer != "" {
+		resolvConf := fmt.Sprintf("nameserver %s\n", m.cfg.Network.cfg.DNSServer)
+		if _, err := vsock.send(agentRequest{Type: "write_file", Path: "/etc/resolv.conf", Content: resolvConf}); err != nil {
+			slog.Warn("firecracker: failed to write resolve.conf, DNS will not work", "sandbox_id", sandboxID, "error", err)
+		}
+	}
 
 	m.mu.Lock()
 	m.running[sandboxID] = &vmInstance{
@@ -217,6 +252,7 @@ func (m *FirecrackerManager) CreateSandbox(ctx context.Context, sandboxID, templ
 		vsockUDS:   vsockUDS,
 		rootfsPath: rootfsPath,
 		vsock:      vsock,
+		guestIP:    guestIP,
 	}
 	m.mu.Unlock()
 
@@ -274,6 +310,10 @@ func (m *FirecrackerManager) KillSandbox(ctx context.Context, sandboxID string) 
 	}
 	removeFileIfExists(inst.apiSocket)
 	removeFileIfExists(inst.vsockUDS)
+
+	if inst.guestIP != nil && m.cfg.Network != nil {
+		m.cfg.Network.ReleaseTap(sandboxID, inst.guestIP)
+	}
 
 	return m.rootfs.Cleanup(sandboxID)
 }
