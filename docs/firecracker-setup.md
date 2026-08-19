@@ -75,6 +75,26 @@ template's rootfs is a manual process. Automating it (a
 `make firecracker-build-template slug=X` target) is a known gap, not yet
 built.
 
+## Building the base rootfs (debootstrap)
+
+The Firecracker quickstart demo rootfs is not suitable as a real sandbox
+base — it lacks a functioning dpkg/apt system entirely. Build a proper one
+instead:
+
+\`\`\`bash
+sudo apt install -y debootstrap
+sudo debootstrap --arch=amd64 jammy ~/firecracker/rootfs-build http://archive.ubuntu.com/ubuntu
+echo "cage-sandbox" | sudo tee ~/firecracker/rootfs-build/etc/hostname
+echo "devpts /dev/pts devpts gid=5,mode=620,ptmxmode=666 0 0" | sudo tee -a ~/firecracker/rootfs-build/etc/fstab
+# + guest agent injection + systemd unit, same as before
+# + package into ext4, size generously (2GB+) up front
+\`\`\`
+
+Known gotchas this build must account for:
+- `ptmxmode=666` in `/etc/fstab` — without it, PTY allocation fails silently and shell sessions get an EOF on connect.
+- Root auto-login via a `serial-getty@ttyS0.service.d` override, since debootstrap doesn't configure this by default.
+- The kernel (`vmlinux.bin`, 4.14) is older than jammy's userspace expects — works for basic use, watch for issues with newer syscall-dependent tools.
+
 ## Registering a template for Firecracker
 
 Templates need `firecracker_rootfs_slug` set in Postgres (see migration
