@@ -3,6 +3,7 @@ package firecracker
 import (
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"sync"
 )
@@ -36,6 +37,10 @@ type NetworkManager struct {
 func NewNetworkManager(cfg NetworkConfig) (*NetworkManager, error) {
 	if !cfg.Enabled {
 		return &NetworkManager{cfg: cfg}, nil
+	}
+
+	if os.Getuid() != 0 {
+		return nil, fmt.Errorf("firecracker networking requires root privilages (CAP_NET_ADMIN) - run the server as root, or set FIRECRACKER_NETWORK_ENABLED=false")
 	}
 
 	ip, _, err := net.ParseCIDR(cfg.BridgeCIDR)
