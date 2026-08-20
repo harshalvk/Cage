@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/harshalvk/cage/internal/backend"
 )
 
 // pauseManifest is persisted as json alongside a snapshot's files, so
@@ -51,9 +53,10 @@ type FirecrackerManager struct {
 	// Injectable dependencies - default to real implementations in
 	// NewFirecrackerManager, overridden by tests via the unexporeted
 	// constructor NewFirecracekrManagerForTest
-	spawnProcess func(ctx context.Context, bin, apiSocket string) (processHandle, error)
+	spawnProcess func(bin, apiSocket string) (processHandle, error)
 	newAPI       func(socketPath string) fcAPI
 	newVsock     func(udsPath string) fcVsock
+	newShell     shellDialerFunc
 
 	mu      sync.Mutex
 	running map[string]*vmInstance // sandboxID -> instance
@@ -78,7 +81,14 @@ func NewFirecrackerManager(cfg Config) (*FirecrackerManager, error) {
 		spawnProcess: realSpawnProcess,
 		newAPI:       func(socketPath string) fcAPI { return newAPIClient(socketPath) },
 		newVsock:     func(udsPath string) fcVsock { return newVsockClient(udsPath) },
-		running:      make(map[string]*vmInstance),
+		newShell: func(udsPath string) (backend.Shell, error) {
+			conn, err := dialShellConn(udsPath)
+			if err != nil {
+				return nil, err
+			}
+			return &FirecrackerShell{conn: conn}, nil
+		},
+		running: make(map[string]*vmInstance),
 	}, nil
 }
 
@@ -88,9 +98,10 @@ func NewFirecrackerManager(cfg Config) (*FirecrackerManager, error) {
 func NewFirecrackerManagerForTest(
 	cfg Config,
 	rootfs *RootfsManager,
-	spawnProcess func(ctx context.Context, bin, apiSocket string) (processHandle, error),
+	spawnProcess func(bin, apiSocket string) (processHandle, error),
 	newAPI func(socketPath string) fcAPI,
 	newVsock func(udsPath string) fcVsock,
+	newShell shellDialerFunc,
 ) *FirecrackerManager {
 	return &FirecrackerManager{
 		cfg:          cfg,
@@ -98,12 +109,18 @@ func NewFirecrackerManagerForTest(
 		spawnProcess: spawnProcess,
 		newAPI:       newAPI,
 		newVsock:     newVsock,
+		newShell:     newShell,
 		running:      make(map[string]*vmInstance),
 	}
 }
 
-func realSpawnProcess(ctx context.Context, bin, apiSocket string) (processHandle, error) {
-	cmd := exec.CommandContext(ctx, bin, "--api-sock", apiSocket)
+func realSpawnProcess(bin, apiSocket string) (processHandle, error) {
+	cmd := exec.Command(bin, "--api-sock", apiSocket)
+	logPath := apiSocket + ".log"
+	if logFile, err := os.Create(logPath); err == nil {
+		cmd.Stdout = logFile
+		cmd.Stderr = logFile
+	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
@@ -145,7 +162,7 @@ func (m *FirecrackerManager) CreateSandbox(ctx context.Context, sandboxID, templ
 	removeFileIfExists(apiSocket)
 	removeFileIfExists(vsockUDS)
 
-	process, err := m.spawnProcess(ctx, m.cfg.FirecrackerBin, apiSocket) // ← was: exec.CommandContext(...) + cmd.Start()
+	process, err := m.spawnProcess(m.cfg.FirecrackerBin, apiSocket) // ← was: exec.CommandContext(...) + cmd.Start()
 	if err != nil {
 		if cerr := m.rootfs.Cleanup(sandboxID); cerr != nil {
 			slog.Warn("firecracker: rootfs cleanup failed after spawn failure", "error", cerr)
@@ -203,7 +220,36 @@ func (m *FirecrackerManager) CreateSandbox(ctx context.Context, sandboxID, templ
 	}
 	m.mu.Unlock()
 
+	go m.watchProcessExit(sandboxID, process)
+
 	return nil
+}
+
+// watchProcessExit blocks until the VM's process exits (whether from a
+// clean KillSandbox call, a crash, or a kernel panic) and reaps it, then
+// removes any stale entry from m.running. Without this, an unexpectedly
+// dead process becomes a zombie at the OS level AND a phantom "running"
+// sandbox at the application level — exactly the failure this fixes.
+func (m *FirecrackerManager) watchProcessExit(sandboxID string, process processHandle) {
+	err := process.Wait()
+
+	m.mu.Lock()
+	inst, stillTracked := m.running[sandboxID]
+	if stillTracked && inst.process == process {
+		delete(m.running, sandboxID)
+	}
+	m.mu.Unlock()
+
+	if stillTracked {
+		if err != nil {
+			slog.Warn("firecracker: vm process exited unexpectedly", "sandbox_id", sandboxID, "error", err)
+		} else {
+			slog.Warn("firecracker: vm process exited unexpectedly (no error)", "sandbox_id", sandboxID)
+		}
+	}
+	// If !stillTracked, this exit was expected (KillSandbox or PauseSandbox
+	// already removed the entry and will/did call Wait() themselves) —
+	// nothing to log or clean up here.
 }
 
 func (m *FirecrackerManager) KillSandbox(ctx context.Context, sandboxID string) error {
@@ -222,9 +268,9 @@ func (m *FirecrackerManager) KillSandbox(ctx context.Context, sandboxID string) 
 		if err := inst.process.Kill(); err != nil {
 			slog.Warn("firecracker: failed to kill process", "sandbox_id", sandboxID, "error", err)
 		}
-		if err := inst.process.Wait(); err != nil {
-			slog.Warn("firecracker: failed to reap process", "sandbox_id", sandboxID, "error", err)
-		}
+		// if err := inst.process.Wait(); err != nil {
+		// 	slog.Warn("firecracker: failed to reap process", "sandbox_id", sandboxID, "error", err)
+		// }
 	}
 	removeFileIfExists(inst.apiSocket)
 	removeFileIfExists(inst.vsockUDS)
@@ -321,7 +367,7 @@ func (m *FirecrackerManager) PauseSandbox(ctx context.Context, sandboxID string)
 	api := m.newAPI(inst.apiSocket)
 
 	if err := api.pauseVM(ctx); err != nil {
-		if rerr := os.RemoveAll(pauseDir); err != nil {
+		if rerr := os.RemoveAll(pauseDir); rerr != nil {
 			slog.Warn("firecracker: failed to clean up pause dir after error", "error", rerr)
 		}
 		return "", fmt.Errorf("failed to pause vm: %w", err)
@@ -355,9 +401,9 @@ func (m *FirecrackerManager) PauseSandbox(ctx context.Context, sandboxID string)
 	if err := inst.process.Kill(); err != nil {
 		slog.Warn("firecracker: failed to kill process after snapshot", "sandbox_id", sandboxID, "error", err)
 	}
-	if err := inst.process.Wait(); err != nil {
-		slog.Warn("firecracker: failed to reap process after snapshot", "sandbox_id", sandboxID, "error", err)
-	}
+	// if err := inst.process.Wait(); err != nil {
+	// 	slog.Warn("firecracker: failed to reap process after snapshot", "sandbox_id", sandboxID, "error", err)
+	// }
 	removeFileIfExists(inst.apiSocket)
 	removeFileIfExists(inst.vsockUDS)
 
@@ -390,7 +436,7 @@ func (m *FirecrackerManager) ResumeSandbox(ctx context.Context, sandboxID, pause
 	removeFileIfExists(apiSocket)
 	removeFileIfExists(vsockUDS)
 
-	process, err := m.spawnProcess(ctx, m.cfg.FirecrackerBin, apiSocket)
+	process, err := m.spawnProcess(m.cfg.FirecrackerBin, apiSocket)
 	if err != nil {
 		return fmt.Errorf("failed to start firecracker process for resume: %w", err)
 	}
@@ -499,4 +545,12 @@ func (m *FirecrackerManager) AdoptWarmResource(ctx context.Context, sandboxID, p
 	inst.sandboxID = sandboxID
 	m.running[sandboxID] = inst
 	return nil
+}
+
+func (m *FirecrackerManager) OpenShell(ctx context.Context, sandboxID string) (backend.Shell, error) {
+	inst, err := m.get(sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	return m.newShell(inst.vsockUDS)
 }

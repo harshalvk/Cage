@@ -41,6 +41,7 @@ func (a *API) OpenShellSession(w http.ResponseWriter, r *http.Request) {
 
 	sb, err := a.store.Get(r.Context(), id)
 	if err != nil {
+		slog.Error("shell: failed to get sandbox", "sandbox_id", id, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -55,6 +56,7 @@ func (a *API) OpenShellSession(w http.ResponseWriter, r *http.Request) {
 
 	shell, err := interactive.OpenShell(r.Context(), sb.ID)
 	if err != nil {
+		slog.Error("shell: failed to open backend shell", "sandbox_id", sb.ID, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

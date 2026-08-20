@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"strings"
 	"time"
 )
 
 const guestAgentPort = 52000
+const shellVsockPort = 52001 // must match guest-agent's shellPort
 
 // agentRequest/agentResponse mirror the guest agent's protocol exactly —
 // keep these in sync with guest-agent/main.go's Request/Response types.
@@ -108,4 +110,51 @@ func (c *vsockClient) waitReady(timeout time.Duration) error {
 		time.Sleep(200 * time.Millisecond)
 	}
 	return fmt.Errorf("guest agent did not become ready within %s: %w", timeout, lastErr)
+}
+
+// dialShellConn performs the vsock CONNECT handshake against the guest
+// agent's shell port and returns the raw connection for continued,
+// persistent, full-duplex streaming - unlike vsockClient.send, which
+// dials, does one round trip, and closes
+func dialShellConn(udsPath string) (net.Conn, error) {
+	conn, err := net.DialTimeout("unix", udsPath, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial vsock uds: %w", err)
+	}
+
+	if _, err := fmt.Fprintf(conn, "CONNECT %d\n", shellVsockPort); err != nil {
+		if cerr := conn.Close(); cerr != nil {
+			slog.Warn("dialShellConn: failed to close connection after write error", "error", cerr)
+		}
+		return nil, fmt.Errorf("failed to send vsock connect: %w", err)
+	}
+
+	reader := bufio.NewReader(conn)
+	handshake, err := reader.ReadString('\n')
+	if err != nil {
+		if cerr := conn.Close(); cerr != nil {
+			slog.Warn("dialShellConn: failed to close connection after handshake read error", "error", cerr)
+		}
+		return nil, fmt.Errorf("failed to read vsock handshake: %w", err)
+	}
+	if !strings.HasPrefix(handshake, "OK") {
+		if cerr := conn.Close(); cerr != nil {
+			slog.Warn("dialShellConn: failed to close connection after failed handshake", "error", cerr)
+		}
+		return nil, fmt.Errorf("vsock handshake failed: %s", strings.TrimSpace(handshake))
+	}
+
+	return &bufferedConn{Conn: conn, r: reader}, nil
+}
+
+// bufferedConn ensures reads after the handshake correctly return any
+// data bufio.Reader already pulled of the wire, before failing through
+// to further raw reads from the underlying connection
+type bufferedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (b *bufferedConn) Read(p []byte) (int, error) {
+	return b.r.Read(p)
 }
