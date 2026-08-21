@@ -150,3 +150,12 @@ func (c *apiClient) loadSnapshot(ctx context.Context, snapshotPath, memFilePath 
 func (c *apiClient) startInstance(ctx context.Context) error {
 	return c.put(ctx, "/actions", map[string]string{"action_type": "InstanceStart"})
 }
+
+// setNetworkInterface attaches a host tap device to the VM as its eth0.
+// Must be called before startInstance.
+func (c *apiClient) setNetworkInterface(ctx context.Context, tapName string) error {
+	return c.put(ctx, "/network-interfaces/eth0", map[string]string{
+		"iface_id":      "eth0",
+		"host_dev_name": tapName,
+	})
+}

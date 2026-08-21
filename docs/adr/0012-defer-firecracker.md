@@ -44,3 +44,7 @@ ambiguity. Setup is documented in docs/firecracker-setup.md. Remaining open
 items: no networking (deliberately deprioritized, vsock covers exec/files),
 no CI coverage for real KVM behavior (mocked tests only), not yet merged
 from the `firecracker` branch to `master`.
+
+## Update — 2026-08-19
+
+Networking implemented: host-side bridge (cage0), per-VM tap devices, NAT/MASQUERADE, kernel-level static IP via boot args. Opt-in via FIRECRACKER_NETWORK_ENABLED. Base rootfs rebuilt via debootstrap (jammy) after discovering the original quickstart demo image lacks a working dpkg — see docs/firecracker-setup.md. All originally-flagged Firecracker gaps (isolation, pause/resume, warm pool, networking) are now closed. Remaining known gaps: no CI coverage against real KVM (mocked tests only), no automated rootfs-build tooling (fully manual debootstrap process).

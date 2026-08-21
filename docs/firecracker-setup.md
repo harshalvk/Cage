@@ -75,6 +75,15 @@ template's rootfs is a manual process. Automating it (a
 `make firecracker-build-template slug=X` target) is a known gap, not yet
 built.
 
+## Building the base rootfs
+
+\`\`\`bash
+export FIRECRACKER_ROOTFS_DIR=/path/to/your/rootfs-dir
+make firecracker-build-rootfs slug=base
+\`\`\`
+
+This script handles debootstrap, the devpts/ptmx fix, root autologin, guest agent injection, and packaging — with verification at each step. See `scripts/build-firecracker-rootfs.sh` if you need to customize the base distro/version.
+
 ## Registering a template for Firecracker
 
 Templates need `firecracker_rootfs_slug` set in Postgres (see migration
@@ -95,8 +104,7 @@ UPDATE templates SET firecracker_rootfs_slug = 'my-slug' WHERE slug = 'my-templa
 - **Both backends cannot run simultaneously.** `ISOLATION_BACKEND` is a
   single global switch, not a per-sandbox choice.
 - **Snapshot/restore is tied to your Firecracker binary version.** Don't
-  upgrade the `firecracker` binary while sandboxes are paused — see ADR
-  0015.
+  upgrade the `firecracker` binary while sandboxes are paused — see ADR 0015.
 - **CI does not test this backend.** GitHub-hosted runners do not expose
   `/dev/kvm`; only the mocked unit tests in `internal/firecracker` run in
   CI. Real validation requires a local run against real KVM.

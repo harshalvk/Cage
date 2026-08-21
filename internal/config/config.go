@@ -12,20 +12,24 @@ import (
 )
 
 type Config struct {
-	Port                 string
-	DatabaseURL          string
-	RedisURL             string
-	ReaperInterval       time.Duration
-	SandboxTTL           time.Duration
-	PausedTTL            time.Duration
-	WarmPoolSize         int
-	LogLevel             string
-	MetricsToken         string
-	IsolationBackend     string // docker or firecracker
-	FirecrackerBin       string
-	FirecrackerKernel    string
-	FirecrackerRootfsDir string
-	FirecrackerRunDir    string
+	Port                      string
+	DatabaseURL               string
+	RedisURL                  string
+	ReaperInterval            time.Duration
+	SandboxTTL                time.Duration
+	PausedTTL                 time.Duration
+	WarmPoolSize              int
+	LogLevel                  string
+	MetricsToken              string
+	IsolationBackend          string // docker or firecracker
+	FirecrackerBin            string
+	FirecrackerKernel         string
+	FirecrackerRootfsDir      string
+	FirecrackerRunDir         string
+	FirecrackerNetworkEnabled bool
+	FirecrackerBridgeCIDR     string
+	FirecrackerSubnetCIDR     string
+	FirecrackerDNSServer      string
 }
 
 func LoadConfig() (*Config, error) {
@@ -45,6 +49,10 @@ func LoadConfig() (*Config, error) {
 	cfg.FirecrackerKernel = getEnv("FIRECRACKER_KERNEL", "/var/lib/cage/vmlinux.bin")
 	cfg.FirecrackerRootfsDir = getEnv("FIRECRACKER_ROOTFS_DIR", "/var/lib/cage/rootfs-base")
 	cfg.FirecrackerRunDir = getEnv("FIRECRACKER_RUN_DIR", "/var/lib/cage/fc-run")
+	cfg.FirecrackerNetworkEnabled = getEnv("FIRECRACKER_NETWORK_ENABLED", "false") == "true"
+	cfg.FirecrackerBridgeCIDR = getEnv("FIRECRACKER_BRIDGE_CIDR", "172.16.0.1/24")
+	cfg.FirecrackerSubnetCIDR = getEnv("FIRECRACKER_SUBNET_CIDR", "172.16.0.0/24")
+	cfg.FirecrackerDNSServer = getEnv("FIRECRACKER_DNS_SERVER", "8.8.8.8")
 
 	cfg.IsolationBackend = getEnv("ISOLATION_BACKEND", "docker")
 	if cfg.IsolationBackend != "docker" && cfg.IsolationBackend != "firecracker" {

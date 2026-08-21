@@ -81,15 +81,27 @@ func run() error {
 
 	switch cfg.IsolationBackend {
 	case "firecracker":
-		fcMgr, err := firecracker.NewFirecrackerManager(firecracker.Config{
+		netMgr, netErr := firecracker.NewNetworkManager(firecracker.NetworkConfig{
+			Enabled:    cfg.FirecrackerNetworkEnabled,
+			BridgeName: "cage0",
+			BridgeCIDR: cfg.FirecrackerBridgeCIDR,
+			SubnetCIDR: cfg.FirecrackerSubnetCIDR,
+			DNSServer:  cfg.FirecrackerDNSServer,
+		})
+		if netErr != nil {
+			return nil
+		}
+		logger.Info("firecracker network manager initialized", "enabled", cfg.FirecrackerNetworkEnabled, "bridge_cidr", cfg.FirecrackerBridgeCIDR)
+		fcMgr, fcErr := firecracker.NewFirecrackerManager(firecracker.Config{
 			FirecrackerBin: cfg.FirecrackerBin,
 			KernelPath:     cfg.FirecrackerKernel,
 			RootfsBaseDir:  cfg.FirecrackerRootfsDir,
 			RunDir:         cfg.FirecrackerRunDir,
 			VCPUCount:      1,
 			MemSizeMiB:     128,
+			Network:        netMgr,
 		})
-		if err != nil {
+		if fcErr != nil {
 			return err
 		}
 		sandboxBackend = fcMgr

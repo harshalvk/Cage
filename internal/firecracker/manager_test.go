@@ -76,6 +76,12 @@ func (f *fakeAPI) setVsock(ctx context.Context, cid uint32, path string) error {
 	}
 	return nil
 }
+func (f *fakeAPI) setNetworkInterface(ctx context.Context, tapName string) error {
+	if f.failAt == "network-interface" {
+		return errors.New("boom")
+	}
+	return nil
+}
 func (f *fakeAPI) startInstance(ctx context.Context) error {
 	if f.failAt == "start-instance" {
 		return errors.New("boom")

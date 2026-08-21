@@ -16,6 +16,7 @@ type fcAPI interface {
 	setBootSource(ctx context.Context, kernelPath, bootArgs string) error
 	setRootDrive(ctx context.Context, rootfsPath string) error
 	setVsock(ctx context.Context, guestCID uint32, udsPath string) error
+	setNetworkInterface(ctx context.Context, tapName string) error
 	startInstance(ctx context.Context) error
 	pauseVM(ctx context.Context) error
 	createSnapshot(ctx context.Context, snapshotPath, memFilePath string) error
