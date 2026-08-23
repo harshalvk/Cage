@@ -1,5 +1,5 @@
 <div align="center">
-<img width="120" height="120" alt="image" src="https://github.com/user-attachments/assets/a1123aca-8933-4a8e-b48f-7afa133b8425" />
+<img width="120" height="120" alt="image" src="https://github.com/user-attachments/assets/2a4195f0-cdff-4617-9945-103395013723" />
 
 # Cage
 
@@ -10,7 +10,7 @@
 
 </div>
 
-<img width="3536" height="840" alt="image" src="https://github.com/user-attachments/assets/255dab5f-7fda-4001-b747-74e75be778ad" />
+<img width="3486" height="1012" alt="image" src="https://github.com/user-attachments/assets/91151043-4059-4126-809c-bb3611c9d2bb" />
 
 **Cage** is an open-source, self-hostable clone of [E2B](https://e2b.dev) — a backend service for spinning up secure, isolated sandboxes to run untrusted or AI-generated code. Built in Go.
 
